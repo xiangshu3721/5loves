@@ -61,7 +61,10 @@ function ChoiceButton({ text, onClick }: { text: string; onClick: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      className="min-h-32 rounded-[28px] bg-paper bg-[url('/art/wash-card.png')] bg-cover bg-center px-5 py-6 text-left text-[1.05rem] leading-relaxed text-ink shadow-rose transition active:scale-[0.985]"
+      className="min-h-32 rounded-[28px] bg-paper bg-cover bg-center px-5 py-6 text-left text-[1.05rem] leading-relaxed text-ink shadow-rose transition active:scale-[0.985]"
+      style={{
+        backgroundImage: `url(${import.meta.env.BASE_URL}art/wash-card.png)`,
+      }}
     >
       {text}
     </button>
