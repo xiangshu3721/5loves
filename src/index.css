@@ -24,6 +24,10 @@
   --shadow-rose: 0 18px 40px rgb(180 74 92 / 0.16);
 }
 
+html {
+  color-scheme: light;
+}
+
 html,
 body,
 #root {
@@ -53,31 +57,6 @@ button,
 textarea,
 select {
   font: inherit;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-blush: #2a181c;
-    --color-blush-deep: #3d2228;
-    --color-paper: #3a2429;
-    --color-coral: #e08a98;
-    --color-coral-ink: #f0a3b0;
-    --color-rose: #f0b4be;
-    --color-ink: #f6e6e9;
-    --color-muted: #d4b4ba;
-    --color-disc-l: #6a3844;
-    --color-disc-o: #7a3e4c;
-    --color-disc-v: #704038;
-    --color-disc-e: #5c3848;
-    --color-disc-y: #6e4438;
-    --color-you: #5a3038;
-    --shadow-rose: 0 18px 40px rgb(0 0 0 / 0.35);
-  }
-
-  body {
-    background: #2a181c;
-    color: var(--color-ink);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
