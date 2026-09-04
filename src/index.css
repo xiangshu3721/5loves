@@ -1,0 +1,91 @@
+@import "@fontsource/ma-shan-zheng";
+@import "@fontsource/noto-sans-sc/400.css";
+@import "@fontsource/noto-sans-sc/500.css";
+@import "@fontsource/noto-sans-sc/700.css";
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Ma Shan Zheng", "Noto Sans SC", serif;
+  --font-sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  --color-blush: #f7d5dc;
+  --color-blush-deep: #eeb8c4;
+  --color-paper: #fff7f8;
+  --color-coral: #e07a8a;
+  --color-coral-ink: #c45c6e;
+  --color-rose: #b54a5c;
+  --color-ink: #4a2c33;
+  --color-muted: #7a535c;
+  --color-disc-l: #f3c1cb;
+  --color-disc-o: #e8a3b0;
+  --color-disc-v: #f0b4a8;
+  --color-disc-e: #e9c3d4;
+  --color-disc-y: #f4d0c2;
+  --color-you: #efc4ce;
+  --shadow-rose: 0 18px 40px rgb(180 74 92 / 0.16);
+}
+
+html,
+body,
+#root {
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-blush);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #e07a8a;
+  color: #fff7f8;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-rose);
+  outline-offset: 3px;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-blush: #2a181c;
+    --color-blush-deep: #3d2228;
+    --color-paper: #3a2429;
+    --color-coral: #e08a98;
+    --color-coral-ink: #f0a3b0;
+    --color-rose: #f0b4be;
+    --color-ink: #f6e6e9;
+    --color-muted: #d4b4ba;
+    --color-disc-l: #6a3844;
+    --color-disc-o: #7a3e4c;
+    --color-disc-v: #704038;
+    --color-disc-e: #5c3848;
+    --color-disc-y: #6e4438;
+    --color-you: #5a3038;
+    --shadow-rose: 0 18px 40px rgb(0 0 0 / 0.35);
+  }
+
+  body {
+    background: #2a181c;
+    color: var(--color-ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
