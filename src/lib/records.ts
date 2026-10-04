@@ -3,7 +3,7 @@ import { LANGUAGE_MAP } from "../data/languages";
 import { primaries, ranked, type Scores } from "./score";
 
 type Kit = {
-  configure: (o: { id: string; title: string; capture?: () => unknown }) => void;
+  configure: (o: { id: string; title: string; capture?: () => unknown; start?: unknown }) => void;
   save: (s: unknown) => { ok: boolean };
   list: () => unknown[];
   exportImage: (s: unknown, t?: number, extra?: { nick?: string }) => void;
@@ -22,7 +22,7 @@ export function kit(): Kit | undefined {
 export function setupKit() {
   const k = kit();
   // capture：导出图片时把结果页上展示的全部内容（含各语言的解读）抓下来画进长图
-  k?.configure({ id: "5loves", title: "爱的 5 种语言", capture: () => k.capture(document.querySelector("main")) });
+  k?.configure({ id: "5loves", title: "爱的 5 种语言", start: [{ sel: "button", text: "^\\s*(开始测试|继续上次)\\s*$" }], capture: () => k.capture(document.querySelector("main")) });
 }
 
 export function summaryOf(scores: Scores) {
