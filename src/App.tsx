@@ -6,7 +6,7 @@ import { Quiz } from "./components/Quiz";
 import { Result } from "./components/Result";
 import { decodeScores, tally, type Scores } from "./lib/score";
 import { clearProgress, loadProgress, saveProgress } from "./lib/storage";
-import { saveResult, setupKit } from "./lib/records";
+import { kit, saveResult, setupKit } from "./lib/records";
 
 setupKit();
 
@@ -32,7 +32,14 @@ export function App() {
     setCanResume(Boolean(saved && saved.picks.length > 0 && saved.index < QUESTIONS.length));
   }, [shared]);
 
+  // 昵称门槛：开始 / 继续 / 再测一次，都要先录好昵称并点「开始测评」
   function startFresh() {
+    const k = kit();
+    if (k) k.ensureNick(doStart);
+    else doStart();
+  }
+
+  function doStart() {
     clearProgress();
     setPicks([]);
     setIndex(0);
@@ -53,10 +60,20 @@ export function App() {
       startFresh();
       return;
     }
-    setPicks(saved.picks as LangCode[]);
-    setIndex(saved.index);
-    setScreen("quiz");
+    const go = () => {
+      setPicks(saved.picks as LangCode[]);
+      setIndex(saved.index);
+      setScreen("quiz");
+    };
+    const k = kit();
+    if (k) k.ensureNick(go);
+    else go();
   }
+
+  // 保险：不管从哪条路进到答题页，没确认过昵称就先补录，点「返回」回首页
+  useEffect(() => {
+    if (screen === "quiz") kit()?.guard(true, () => setScreen("intro"));
+  }, [screen]);
 
   function pick(side: "left" | "right") {
     const item = QUESTIONS[index];
@@ -89,7 +106,16 @@ export function App() {
   }
 
   if (screen === "result" && scores) {
-    return <Result scores={scores} onRetake={startFresh} saved={saved} />;
+    return (
+      <Result
+        scores={scores}
+        onRetake={() => {
+          kit()?.nickReset();
+          startFresh();
+        }}
+        saved={saved}
+      />
+    );
   }
 
   if (screen === "quiz") {
