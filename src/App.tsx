@@ -6,6 +6,9 @@ import { Quiz } from "./components/Quiz";
 import { Result } from "./components/Result";
 import { decodeScores, tally, type Scores } from "./lib/score";
 import { clearProgress, loadProgress, saveProgress } from "./lib/storage";
+import { saveResult, setupKit } from "./lib/records";
+
+setupKit();
 
 type Screen = "intro" | "quiz" | "result";
 
@@ -20,6 +23,8 @@ export function App() {
   const [picks, setPicks] = useState<LangCode[]>([]);
   const [scores, setScores] = useState<Scores | null>(shared);
   const [canResume, setCanResume] = useState(false);
+  // null = 这次没有交卷（打开的是分享链接）；true / false = 本次交卷后保存成功 / 失败
+  const [saved, setSaved] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (shared) return;
@@ -32,6 +37,7 @@ export function App() {
     setPicks([]);
     setIndex(0);
     setScores(null);
+    setSaved(null);
     setCanResume(false);
     if (window.location.search) {
       const url = new URL(window.location.href);
@@ -61,6 +67,7 @@ export function App() {
     if (nextIndex >= QUESTIONS.length) {
       const nextScores = tally(nextPicks);
       setScores(nextScores);
+      setSaved(saveResult(nextScores));
       clearProgress();
       setScreen("result");
       return;
@@ -82,7 +89,7 @@ export function App() {
   }
 
   if (screen === "result" && scores) {
-    return <Result scores={scores} onRetake={startFresh} />;
+    return <Result scores={scores} onRetake={startFresh} saved={saved} />;
   }
 
   if (screen === "quiz") {

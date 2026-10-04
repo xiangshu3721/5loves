@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "motion/react";
 import { LoveCluster } from "./LoveCluster";
+import { historyCount, kit } from "../lib/records";
 
 type Props = {
   onStart: () => void;
@@ -47,6 +48,15 @@ export function Intro({ onStart, canResume, onResume }: Props) {
             className="w-full rounded-full border border-rose/30 bg-paper/70 py-3.5 text-base font-medium text-rose transition active:scale-[0.98]"
           >
             继续上次
+          </button>
+        ) : null}
+        {historyCount() > 0 ? (
+          <button
+            type="button"
+            onClick={() => kit()?.showHistory()}
+            className="w-full rounded-full border border-rose/30 bg-paper/70 py-3.5 text-base font-medium text-rose transition active:scale-[0.98]"
+          >
+            历史记录（{historyCount()}）
           </button>
         ) : null}
       </div>

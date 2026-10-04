@@ -8,13 +8,15 @@ import {
   resultUrl,
   type Scores,
 } from "../lib/score";
+import { historyCount, kit, summaryOf } from "../lib/records";
 
 type Props = {
   scores: Scores;
   onRetake: () => void;
+  saved: boolean | null;
 };
 
-export function Result({ scores, onRetake }: Props) {
+export function Result({ scores, onRetake, saved }: Props) {
   const reduce = useReducedMotion();
   const winners = primaries(scores);
   const order = ranked(scores);
@@ -83,6 +85,29 @@ export function Result({ scores, onRetake }: Props) {
             {shownUrl}
           </p>
         ) : null}
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => kit()?.exportImage(summaryOf(scores))}
+            className="flex-1 rounded-full border border-rose/30 bg-paper/70 py-3.5 text-base font-medium text-rose transition active:scale-[0.98]"
+          >
+            导出图片
+          </button>
+          <button
+            type="button"
+            onClick={() => kit()?.showHistory()}
+            className="flex-1 rounded-full border border-rose/30 bg-paper/70 py-3.5 text-base font-medium text-rose transition active:scale-[0.98]"
+          >
+            历史记录{historyCount() ? `（${historyCount()}）` : ""}
+          </button>
+        </div>
+        <p className="text-center text-xs leading-relaxed text-muted" data-save-note>
+          {saved === true
+            ? "✓ 这次结果已保存在这台设备（不上传），可在「历史记录」里再看。"
+            : saved === false
+              ? "这台设备暂时存不下记录（可能是无痕模式或空间已满）。结果照常能看，建议先点「导出图片」留一份。"
+              : "每次做完的结果都会记在「历史记录」里，只存在这台设备上。"}
+        </p>
         <button
           type="button"
           onClick={onRetake}
