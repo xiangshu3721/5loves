@@ -3,12 +3,16 @@ import { LANGUAGE_MAP } from "../data/languages";
 import { primaries, ranked, type Scores } from "./score";
 
 type Kit = {
-  configure: (o: { id: string; title: string }) => void;
+  configure: (o: { id: string; title: string; capture?: () => unknown }) => void;
   save: (s: unknown) => { ok: boolean };
   list: () => unknown[];
-  exportImage: (s: unknown, t?: number) => void;
+  exportImage: (s: unknown, t?: number, extra?: { nick?: string }) => void;
   showHistory: () => void;
   lastSave: () => { ok: boolean } | null;
+  ensureNick: (cb: () => void, o?: { onCancel?: () => void }) => void;
+  guard: (answering: boolean, onCancel?: () => void) => void;
+  nickReset: () => void;
+  capture: (root: Element | null, o?: { skip?: string }) => unknown;
 };
 
 export function kit(): Kit | undefined {
@@ -16,7 +20,9 @@ export function kit(): Kit | undefined {
 }
 
 export function setupKit() {
-  kit()?.configure({ id: "5loves", title: "爱的 5 种语言" });
+  const k = kit();
+  // capture：导出图片时把结果页上展示的全部内容（含各语言的解读）抓下来画进长图
+  k?.configure({ id: "5loves", title: "爱的 5 种语言", capture: () => k.capture(document.querySelector("main")) });
 }
 
 export function summaryOf(scores: Scores) {

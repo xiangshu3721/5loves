@@ -71,7 +71,7 @@ export function Result({ scores, onRetake, saved }: Props) {
         ))}
       </ul>
 
-      <div className="sticky bottom-0 z-10 mt-8 flex flex-col gap-3 bg-blush/95 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
+      <div data-rk-skip className="sticky bottom-0 z-10 mt-8 flex flex-col gap-3 bg-blush/95 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
         <button
           type="button"
           onClick={share}
@@ -88,7 +88,7 @@ export function Result({ scores, onRetake, saved }: Props) {
         <div className="flex gap-3">
           <button
             type="button"
-            onClick={() => kit()?.exportImage(summaryOf(scores))}
+            onClick={() => kit()?.exportImage(summaryOf(scores), undefined, saved === null ? { nick: "" } : undefined)}
             className="flex-1 rounded-full border border-rose/30 bg-paper/70 py-3.5 text-base font-medium text-rose transition active:scale-[0.98]"
           >
             导出图片
