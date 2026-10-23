@@ -6,6 +6,16 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+// tests/vendor 是 mindtest-web cursor/sefs-allow-assessment-75bb 上
+// cloud/assessment-report/vendor/loves5-*.mjs 的原样副本，用来锁定正文。
+import { buildLoves5Result as vendorBuild } from "./vendor/loves5-payload.mjs";
+import {
+  LANGUAGES as VENDOR_LANGUAGES,
+  LOVES5_READER_GAP as VENDOR_GAP,
+  LOVES5_SCREEN as VENDOR_SCREEN,
+  PAIRS,
+  loves5BodyParts,
+} from "./vendor/loves5-score.mjs";
 
 const cache = new Map();
 
@@ -58,7 +68,7 @@ const {
   ASSESSMENT_NAME,
   LOVES5_VERSION,
   SCHEMA_VERSION,
-  LOVES5_SCREEN_TEXT,
+  LOVES5_SCREEN,
   LOVES5_READER_GAP,
 } = payload;
 const { tally, primaries, ranked } = score;
@@ -76,39 +86,27 @@ function base(extra) {
   };
 }
 
-function picksOf(counts) {
-  const picks = [];
-  for (const code of ["A", "B", "C", "D", "E"]) {
-    for (let i = 0; i < counts[code]; i += 1) picks.push(code);
-  }
-  return picks;
+function sidePicks(side) {
+  return QUESTIONS.map((item) => item[side].code);
 }
+
+const TIED_PICKS = "EBBDECDEABCDCECBDBCAEDCCDEEDCE".split("");
 
 function same(actual, expected) {
   assert.equal(JSON.stringify(actual), JSON.stringify(expected));
-}
-
-function keysOf(value, found = []) {
-  if (!value || typeof value !== "object") return found;
-  const keys = Array.isArray(value) ? [] : Object.keys(value);
-  for (const key of keys) {
-    found.push(key);
-    keysOf(value[key], found);
-  }
-  if (Array.isArray(value)) value.forEach((item) => keysOf(item, found));
-  return found;
 }
 
 test("称呼取前 12 个字，空称呼、手机号和坏答案不上传", () => {
   assert.equal(loves5Nickname(" 林深 "), "林深");
   assert.equal(loves5Nickname(`${"林深".repeat(6)}尾`), "林深".repeat(6));
   assert.equal(loves5Nickname(" "), "");
-  const picks = picksOf({ A: 12, B: 8, C: 6, D: 4, E: 0 });
+  const picks = sidePicks("left");
   const scores = tally(picks);
   assert.equal(buildLoves5Result(base({ nickname: " ", picks, scores })), null);
   assert.equal(buildLoves5Result(base({ nickname: "13800000000", picks, scores })), null);
   assert.equal(buildLoves5Result(base({ picks: picks.slice(0, 29), scores })), null);
   assert.equal(buildLoves5Result(base({ picks: picks.map((code, index) => (index === 0 ? "Z" : code)), scores })), null);
+  assert.equal(buildLoves5Result(base({ picks: picks.map((code, index) => (index === 0 ? "B" : code)), scores })), null);
   assert.equal(buildLoves5Result(base({ picks, scores, reportId: "" })), null);
   assert.equal(buildLoves5Result(base({ picks, scores, clientSubmissionId: "nope" })), null);
   assert.equal(buildLoves5Result(base({ picks, scores, completedAt: "昨天" })), null);
@@ -119,9 +117,10 @@ test("称呼取前 12 个字，空称呼、手机号和坏答案不上传", () =
   assert.equal(buildLoves5Result(base({})), null);
 });
 
-test("30 个选项生成协议，分数、主爱语、排序跟计分，不含题目和私人字段", () => {
-  const picks = picksOf({ A: 12, B: 8, C: 4, D: 6, E: 0 });
+test("30 个题侧选项生成协议，分数在 extensionData.score，不含题目和私人字段", () => {
+  const picks = sidePicks("left");
   const scores = tally(picks);
+  const winners = primaries(scores);
   const report = buildLoves5Result(base({
     nickname: `${"林深".repeat(6)}多余`,
     picks,
@@ -132,8 +131,6 @@ test("30 个选项生成协议，分数、主爱语、排序跟计分，不含�
     linkSecret: "secret-link",
     ownerToken: "secret-owner",
     profile: { name: "张三", phone: "13800000000" },
-    meaning: LANGUAGES[0].meaning,
-    how: LANGUAGES[0].how,
   }));
   const packed = JSON.stringify(report);
   assert.equal(report.assessmentId, "loves5");
@@ -145,40 +142,52 @@ test("30 个选项生成协议，分数、主爱语、排序跟计分，不含�
   assert.equal(report.schemaVersion, "1.0.0");
   assert.equal(report.schemaVersion, SCHEMA_VERSION);
   assert.equal(report.nickname, "林深".repeat(6));
-  same(report.extensionData.picks, picks);
+  same(report.extensionData.answers, picks);
   same(report.reportContent.viewModel.picks, picks);
-  same(report.extensionData.scores, scores);
+  same(report.extensionData.score.scores, scores);
   same(report.reportContent.viewModel.scores, scores);
-  same(report.extensionData.primaries, primaries(scores));
-  same(report.extensionData.ranked, ranked(scores));
-  same(report.reportContent.viewModel.primaries, primaries(scores));
+  same(report.extensionData.score.primaries, winners);
+  same(report.extensionData.score.ranked, ranked(scores));
+  assert.equal(report.extensionData.score.total, 30);
+  same(report.reportContent.viewModel.primaries, winners);
   same(report.reportContent.viewModel.ranked, ranked(scores));
-  assert.equal(report.extensionData.scores.A + report.extensionData.scores.B + report.extensionData.scores.C + report.extensionData.scores.D + report.extensionData.scores.E, 30);
+  assert.equal(report.extensionData.picks, undefined);
+  assert.equal(report.extensionData.scores, undefined);
+  assert.equal(report.extensionData.primaries, undefined);
+  assert.equal(report.extensionData.ranked, undefined);
   for (const code of ["A", "B", "C", "D", "E"]) {
-    assert.equal(report.extensionData.scores[code] >= 0 && report.extensionData.scores[code] <= 12, true);
+    assert.equal(report.extensionData.score.scores[code] >= 0 && report.extensionData.score.scores[code] <= 12, true);
   }
   same(report.dimensions.map((item) => item.id), ["A", "B", "C", "D", "E"]);
   same(report.dimensions.map((item) => item.score), ["A", "B", "C", "D", "E"].map((code) => scores[code]));
+  same(report.dimensions.map((item) => item.raw), ["A", "B", "C", "D", "E"].map((code) => scores[code]));
   same(report.dimensions.map((item) => item.name), LANGUAGES.map((item) => item.name));
-  assert.equal(report.result.code, "A");
-  assert.equal(report.result.headline, "主爱语：肯定的言词");
+  same(report.dimensions.map((item) => item.narrative), LANGUAGES.map((item) => item.meaning));
+  assert.equal(report.result.code, winners.join(""));
+  assert.equal(report.result.code === "tied", false);
+  assert.equal(report.result.headline, LANGUAGES.find((item) => item.code === winners[0]).name);
+  assert.equal(report.result.label, "主爱语");
   assert.equal(report.result.flags.length, 0);
-  assert.equal(report.result.summary.includes(LOVES5_SCREEN_TEXT), false);
+  assert.equal(report.result.summary.includes(LOVES5_SCREEN), true);
   assert.equal(report.extensionData.quality.rushed, false);
   assert.equal(report.reportContent.viewModel.rushed, false);
   assert.equal(report.extensionData.consent.version, "consent-assessment-loves5-1");
   same(report.extensionData.consent.scopes, ["store", "share_link", "mentor_read"]);
   assert.equal(report.extensionData.compat.level, "partial");
   assert.equal(report.extensionData.compat.gaps[0], LOVES5_READER_GAP);
+  assert.equal(LOVES5_SCREEN, VENDOR_SCREEN);
+  assert.equal(LOVES5_READER_GAP, VENDOR_GAP);
+  assert.equal(report.source.site, "爱的 5 种语言");
   assert.equal(report.source.repo, "5loves");
   assert.equal(report.source.origin, "external-repo");
   assert.equal(report.source.path, "index.html");
   assert.equal(report.source.pageUrl, "https://xiangshu3721.github.io/5loves/");
   assert.equal(report.source.resultKitId, "loves5");
-  assert.equal(report.source.localKey, "5loves");
+  assert.equal(report.source.localKey, "loves5-session");
   assert.equal(report.reportContent.format, "view-model+sections");
   assert.equal(report.reportContent.textFallback, report.reportContent.sections.map((section) => section.x).join(""));
   assert.equal(report.recommendations[0].title, null);
+  assert.equal(report.recommendations[0].text, LOVES5_SCREEN);
   assert.equal(report.recommendations[1].text, LOVES5_READER_GAP);
   assert.equal(packed.includes("13800000000"), false);
   assert.equal(packed.includes("secret-wechat"), false);
@@ -187,46 +196,77 @@ test("30 个选项生成协议，分数、主爱语、排序跟计分，不含�
   assert.equal(packed.includes("secret-owner"), false);
   assert.equal(packed.includes("张三"), false);
   assert.equal(packed.includes(QUESTIONS[0].left.text), false);
-  assert.equal(packed.includes(LANGUAGES[0].meaning), false);
-  assert.equal(packed.includes(LANGUAGES[0].how), false);
   assert.equal(packed.includes("微信"), false);
   assert.equal(packed.includes("二维码"), false);
-  for (const key of ["phone", "wechat", "wechatQr", "profile", "meaning", "how", "linkSecret", "ownerToken"]) {
-    assert.equal(keysOf(report).includes(key), false, key);
+  for (const key of ["phone", "wechat", "wechatQr", "profile", "linkSecret", "ownerToken", "picks", "scores", "primaries", "ranked"]) {
+    assert.equal(Object.keys(report.extensionData).includes(key), false, key);
   }
   same(Object.keys(report).sort(), [
     "assessmentId", "assessmentName", "assessmentVersion", "completedAt", "dimensions",
     "extensionData", "interpretation", "nickname", "recommendations", "reportContent",
     "reportId", "result", "schemaVersion", "source",
   ].sort());
-  same(Object.keys(report.extensionData).sort(), ["compat", "consent", "picks", "primaries", "quality", "ranked", "scores"]);
+  same(Object.keys(report.extensionData).sort(), ["answers", "compat", "consent", "quality", "score"]);
+  same(Object.keys(report.extensionData.score).sort(), ["primaries", "ranked", "scores", "total"]);
 });
 
-test("只有分数时也能生成，并列主爱语记为 tied", () => {
-  const scores = { A: 10, B: 10, C: 4, D: 3, E: 3 };
-  const report = buildLoves5Result(base({ scores }));
-  assert.equal(report.extensionData.picks, undefined);
-  assert.equal(report.reportContent.viewModel.picks, undefined);
-  same(report.extensionData.scores, scores);
-  same(report.extensionData.primaries, ["A", "B"]);
-  same(report.extensionData.ranked, ["A", "B", "C", "D", "E"]);
-  assert.equal(report.result.code, "tied");
+test("没有 30 道题侧选项时不生成；并列主爱语的 code 是字母连写", () => {
+  assert.equal(buildLoves5Result(base({ scores: { A: 10, B: 10, C: 4, D: 3, E: 3 } })), null);
+  const picks = TIED_PICKS;
+  const scores = tally(picks);
+  const report = buildLoves5Result(base({ picks, scores }));
+  same(report.extensionData.answers, picks);
+  same(report.extensionData.score.scores, scores);
+  same(report.extensionData.score.primaries, ["C", "E"]);
+  assert.equal(report.result.code, "CE");
   same(report.result.flags, ["tied"]);
-  assert.equal(report.result.label, "肯定的言词 与 精心的时刻");
-  assert.equal(report.dimensions.filter((item) => item.level === "primary").map((item) => item.id).join(""), "AB");
+  assert.equal(report.result.label, "并列主爱语");
+  assert.equal(report.result.headline, "接受礼物 与 身体的接触");
+  const primary = report.dimensions.filter((item) => item.level === "primary");
+  assert.equal(primary.map((item) => item.id).join(""), "CE");
+  assert.equal(primary.every((item) => item.levelLabel === "并列主爱语"), true);
+  assert.equal(report.dimensions.filter((item) => item.level === "other").every((item) => item.levelLabel === null), true);
 });
 
 test("按题目左右选项作答时五种分数都在 0 到 12 且合计 30", () => {
-  const left = QUESTIONS.map((item) => item.left.code);
-  const right = QUESTIONS.map((item) => item.right.code);
-  for (const picks of [left, right]) {
+  for (const picks of [sidePicks("left"), sidePicks("right")]) {
     const scores = tally(picks);
     const report = buildLoves5Result(base({ picks, scores }));
-    const values = ["A", "B", "C", "D", "E"].map((code) => report.extensionData.scores[code]);
+    const values = ["A", "B", "C", "D", "E"].map((code) => report.extensionData.score.scores[code]);
     assert.equal(values.reduce((sum, n) => sum + n, 0), 30);
     assert.equal(values.every((n) => n >= 0 && n <= 12), true);
-    same(report.extensionData.primaries, primaries(scores));
-    same(report.extensionData.ranked, ranked(scores));
+    same(report.extensionData.score.primaries, primaries(scores));
+    same(report.extensionData.score.ranked, ranked(scores));
+  }
+});
+
+test("同一份作答与 vendor loves5BodyParts、buildLoves5Result 逐字相同", () => {
+  assert.equal(JSON.stringify(QUESTIONS.map((item) => `${item.left.code}${item.right.code}`)), JSON.stringify(PAIRS));
+  LANGUAGES.forEach((item, index) => {
+    const vendor = VENDOR_LANGUAGES[index];
+    assert.equal(item.code, vendor.id);
+    assert.equal(item.name, vendor.name);
+    assert.equal(item.english, vendor.english);
+    assert.equal(item.meaning, vendor.meaning);
+    assert.equal(item.how, vendor.how);
+  });
+  for (const picks of [sidePicks("left"), sidePicks("right"), TIED_PICKS]) {
+    for (const rushed of [false, true]) {
+      const input = base({ picks, rushed });
+      const report = buildLoves5Result(input);
+      const expected = vendorBuild(input);
+      assert.equal(JSON.stringify(report), JSON.stringify(expected));
+      const parts = loves5BodyParts(picks, rushed);
+      assert.equal(JSON.stringify(report.dimensions), JSON.stringify(parts.dimensions));
+      assert.equal(JSON.stringify(report.result), JSON.stringify(parts.result));
+      assert.equal(JSON.stringify(report.interpretation), JSON.stringify(parts.interpretation));
+      assert.equal(JSON.stringify(report.recommendations), JSON.stringify(parts.recommendations));
+      assert.equal(JSON.stringify(report.reportContent), JSON.stringify(parts.reportContent));
+      assert.equal(JSON.stringify(report.extensionData.score), JSON.stringify(parts.score));
+      assert.equal(JSON.stringify(report.extensionData.answers), JSON.stringify(picks));
+      const withScores = buildLoves5Result(base({ picks, scores: tally(picks), rushed }));
+      assert.equal(JSON.stringify(withScores), JSON.stringify(expected));
+    }
   }
 });
 
@@ -258,5 +298,5 @@ test("分享链接约 75 字，提交体不带密钥，结果页只有一个分�
   assert.equal(result.includes("复制结果链接"), false);
   assert.equal(result.includes("导出图片"), true);
   assert.equal(result.includes("历史记录"), true);
-  assert.equal(LOVES5_SCREEN_TEXT.includes("诊断"), true);
+  assert.equal(LOVES5_SCREEN.includes("诊断"), true);
 });
