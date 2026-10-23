@@ -60,9 +60,8 @@ function loadShare(hooks) {
   return loadTS("../src/lib/cloud-share.ts");
 }
 
-const picks = []
-  .concat(Array(12).fill("A"), Array(8).fill("B"), Array(4).fill("C"), Array(6).fill("D"));
-const scores = { A: 12, B: 8, C: 4, D: 6, E: 0 };
+const picks = "ABCDEBAECBCBCBEBCAEDEBCBBEDACB".split("");
+const scores = { A: 4, B: 10, C: 7, D: 3, E: 6 };
 
 function flush() {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
@@ -89,9 +88,12 @@ test("结果页挂上后只提交一次，正文只有标准化结果", async ()
   assert.equal(calls[0].body.result.assessmentId, "loves5");
   assert.equal(calls[0].body.result.assessmentVersion, "loves5-h5-v1");
   assert.equal(calls[0].body.result.nickname, "林深");
-  assert.deepEqual(calls[0].body.result.extensionData.scores, scores);
-  assert.deepEqual(calls[0].body.result.extensionData.picks, picks);
-  assert.deepEqual(calls[0].body.result.extensionData.primaries, ["A"]);
+  assert.deepEqual(calls[0].body.result.extensionData.answers, picks);
+  assert.deepEqual(calls[0].body.result.extensionData.score.scores, scores);
+  assert.deepEqual(calls[0].body.result.extensionData.score.primaries, ["B"]);
+  assert.equal(calls[0].body.result.result.code, "B");
+  assert.equal(calls[0].body.result.extensionData.picks, undefined);
+  assert.equal(calls[0].body.result.extensionData.scores, undefined);
   assert.equal(calls[0].body.result.linkSecret, undefined);
   assert.equal(typeof calls[0].body.linkSecret, "string");
   assert.equal(typeof calls[0].body.ownerToken, "string");
@@ -121,6 +123,46 @@ test("服务端拒绝时停在失败，不连着重试", async () => {
   assert.equal(view.url, "");
   assert.equal(view.note, "这次没生成链接");
   assert.equal(JSON.stringify(calls[0].result).includes("微信"), false);
+});
+
+test("已记下的旧正文在提交前改成 vendor 形状，提交号不变", async () => {
+  const calls = [];
+  const storage = memoryStorage();
+  const share = loadShare({
+    storage,
+    fetch: async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return { status: 200, json: async () => ({ reportId: calls[0].result.reportId }) };
+    },
+  });
+  const key = share.loves5ShareKey("林深", picks, scores);
+  storage.setItem("rk.cloud.pending.v1", JSON.stringify({
+    v: 1,
+    items: [{
+      reportId: "rpt_abcdefghijk",
+      clientSubmissionId: "sub_abcdefghijklmnop",
+      linkSecret: "a".repeat(16),
+      ownerToken: "b".repeat(16),
+      orderKey: key,
+      payload: {
+        reportId: "rpt_abcdefghijk",
+        completedAt: "2026-10-23T15:04:05+08:00",
+        extensionData: { picks, scores, primaries: ["B"], ranked: ["B"] },
+        result: { code: "tied" },
+      },
+      attempts: 0,
+      nextAt: 0,
+      lastError: "",
+    }],
+  }));
+  share.watchLoves5Share({ nickname: "林深", picks, scores }, () => {}, storage);
+  await flush();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].result.reportId, "rpt_abcdefghijk");
+  assert.equal(calls[0].result.completedAt, "2026-10-23T15:04:05+08:00");
+  assert.deepEqual(calls[0].result.extensionData.answers, picks);
+  assert.equal(calls[0].result.extensionData.picks, undefined);
+  assert.equal(calls[0].result.result.code, "B");
 });
 
 test("没有称呼时不提交", async () => {

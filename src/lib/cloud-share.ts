@@ -80,20 +80,43 @@ function initialView(storage: KeyValueStorage, key: string): ShareView {
   return { saving: false, note: failed ? pending?.lastError || "这次没生成链接" : "", url: "", failed };
 }
 
-function ensurePending(room: Room) {
-  const cloud = createCloudStore(room.storage);
-  const found = pendingItem(room.storage, room.key);
-  if (found) return found;
-  const ids = createSubmissionIds();
-  if (ids.linkSecret === ids.ownerToken) ids.ownerToken = createSubmissionIds().ownerToken;
-  const payload = buildLoves5Result({
+function resultPayload(
+  room: Room,
+  ids: { reportId: string; clientSubmissionId: string; completedAt: string },
+) {
+  return buildLoves5Result({
     nickname: room.nickname,
     picks: room.picks,
     scores: room.scores,
     reportId: ids.reportId,
     clientSubmissionId: ids.clientSubmissionId,
-    completedAt: isoShanghai(new Date()),
+    completedAt: ids.completedAt,
     rushed: false,
+  });
+}
+
+function ensurePending(room: Room) {
+  const cloud = createCloudStore(room.storage);
+  const found = pendingItem(room.storage, room.key);
+  if (found) {
+    const previous = found.payload;
+    const completedAt = previous && previous.completedAt ? previous.completedAt : isoShanghai(new Date());
+    const payload = resultPayload(room, {
+      reportId: found.reportId,
+      clientSubmissionId: found.clientSubmissionId,
+      completedAt,
+    });
+    if (!payload) return null;
+    found.payload = payload;
+    cloud.upsertPending(found);
+    return found;
+  }
+  const ids = createSubmissionIds();
+  if (ids.linkSecret === ids.ownerToken) ids.ownerToken = createSubmissionIds().ownerToken;
+  const payload = resultPayload(room, {
+    reportId: ids.reportId,
+    clientSubmissionId: ids.clientSubmissionId,
+    completedAt: isoShanghai(new Date()),
   });
   if (!payload) return null;
   const item: PendingItem = { ...ids, orderKey: room.key, payload, attempts: 0, nextAt: 0, lastError: "" };
