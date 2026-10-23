@@ -109,6 +109,7 @@ export function App() {
     return (
       <Result
         scores={scores}
+        picks={picks}
         onRetake={() => {
           kit()?.nickReset();
           startFresh();

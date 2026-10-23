@@ -1,50 +1,24 @@
-import { Check, LinkSimple } from "@phosphor-icons/react";
 import { motion, useReducedMotion } from "motion/react";
-import { useState } from "react";
 import { LANGUAGE_MAP, type LangCode } from "../data/languages";
+import { ShareResult } from "./ShareResult";
 import {
   primaries,
   ranked,
-  resultUrl,
   type Scores,
 } from "../lib/score";
 import { historyCount, kit, summaryOf } from "../lib/records";
 
 type Props = {
   scores: Scores;
+  picks: LangCode[];
   onRetake: () => void;
   saved: boolean | null;
 };
 
-export function Result({ scores, onRetake, saved }: Props) {
+export function Result({ scores, picks, onRetake, saved }: Props) {
   const reduce = useReducedMotion();
   const winners = primaries(scores);
   const order = ranked(scores);
-  const [copied, setCopied] = useState(false);
-  const [shownUrl, setShownUrl] = useState("");
-
-  async function share() {
-    const url = resultUrl(scores);
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "我的爱的语言",
-          url,
-        });
-        return;
-      } catch {
-        /* cancelled */
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setShownUrl(url);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setShownUrl(url);
-    }
-  }
 
   const title =
     winners.length === 1
@@ -72,19 +46,7 @@ export function Result({ scores, onRetake, saved }: Props) {
       </ul>
 
       <div data-rk-skip className="sticky bottom-0 z-10 mt-8 flex flex-col gap-3 bg-blush/95 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
-        <button
-          type="button"
-          onClick={share}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-rose py-3.5 text-base font-medium text-paper shadow-rose transition active:scale-[0.98]"
-        >
-          {copied ? <Check size={20} weight="bold" /> : <LinkSimple size={20} weight="bold" />}
-          {copied ? "链接已复制" : "复制结果链接"}
-        </button>
-        {shownUrl ? (
-          <p className="break-all rounded-[20px] bg-paper/80 px-4 py-3 text-xs leading-relaxed text-muted">
-            {shownUrl}
-          </p>
-        ) : null}
+        <ShareResult scores={scores} picks={picks} />
         <div className="flex gap-3">
           <button
             type="button"
