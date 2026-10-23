@@ -13,6 +13,7 @@ type Kit = {
   guard: (answering: boolean, onCancel?: () => void) => void;
   nickReset: () => void;
   capture: (root: Element | null, o?: { skip?: string }) => unknown;
+  nick?: { get: () => string; set: (value: string) => string; clean: (value: string) => string; confirmed: () => boolean };
 };
 
 export function kit(): Kit | undefined {
